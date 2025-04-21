@@ -7,7 +7,7 @@ import { Contact } from "../screens/Contact";
 import { Shop } from "../screens/Shop";
 import { Login } from "../screens/Auth/Login";
 import { Register } from "../screens/Auth/Register";
-import { Booking } from "../screens/Booking";
+import { EnhancedBooking } from "../screens/Booking";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 
 export const AppRoutes = () => (
@@ -22,7 +22,7 @@ export const AppRoutes = () => (
         path="booking"
         element={
           <ProtectedRoute>
-            <Booking />
+            <EnhancedBooking />
           </ProtectedRoute>
         }
       />
