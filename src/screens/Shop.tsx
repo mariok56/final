@@ -2,7 +2,7 @@ import { useState, useEffect,useCallback } from 'react';
 import { create } from 'zustand';
 import { Button } from "../components/ui/button";
 import { Search, ShoppingCart, Filter, ChevronDown, X, Plus, Minus, Trash2, CreditCard, ArrowLeft } from "lucide-react";
-import _ from 'lodash';
+
 
 // Product type definition
 type Product = {
@@ -352,13 +352,25 @@ export const Shop = () => {
   };
   
 
-// Create a debounced function for search
-const debouncedSearch = useCallback(
-  _.debounce((term: string) => {
-    setSearchTerm(term);
-  }, 500),
-  []
-);
+  const debounce = (func: Function, wait: number) => {
+    let timeout: NodeJS.Timeout;
+    return function executedFunction(...args: any[]) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+  
+  // Update the debouncedSearch:
+  const debouncedSearch = useCallback(
+    debounce((term: string) => {
+      setSearchTerm(term);
+    }, 500),
+    []
+  );
 
 // Handle search input change
 const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
