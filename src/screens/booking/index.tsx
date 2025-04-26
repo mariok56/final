@@ -1,4 +1,7 @@
+// src/screens/booking/index.tsx
 import { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useBookingStore } from '../../store/bookinStore';
 import { useAuthStore } from '../../store/authStore';
 import { BookingProgress } from './components/BookingProgress';
@@ -14,13 +17,69 @@ export const EnhancedBooking = () => {
   const [step, setStep] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [activeTab, setActiveTab] = useState<'new' | 'manage'>('new');
+  const [loading, setLoading] = useState(true);
   
   const {
     selectStylist,
     selectDate,
     selectTimeSlot,
-    clearServices
+    clearServices,
+    fetchAppointments,
   } = useBookingStore();
+  
+  // Fetch services and stylists from Firestore on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch services
+        const servicesSnapshot = await getDocs(collection(db, 'services'));
+        const servicesData = servicesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '',
+            price: data.price || 0,
+            duration: data.duration || 0,
+            description: data.description || '',
+            image: data.image || ''
+          };
+        });
+        
+        // Fetch stylists
+        const stylistsSnapshot = await getDocs(collection(db, 'stylists'));
+        const stylistsData = stylistsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: parseInt(doc.id),
+            name: data.name || '',
+            specialty: data.specialty || '',
+            image: data.image || '',
+            rating: data.rating || 0,
+            experience: data.experience || 0,
+            availableDays: data.availability?.map((a: any) => a.day) || [],
+            workingHours: data.availability?.map((a: any) => a.hours) || []
+          };
+        });
+        
+        // Update store with fetched data
+        useBookingStore.setState({ 
+          services: servicesData,
+          stylists: stylistsData 
+        });
+        
+        // Fetch appointments if user is authenticated
+        if (user?.id) {
+          await fetchAppointments(user.id);
+        }
+      } catch (error) {
+        console.error('Error fetching booking data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
   
   // Reset selections when going back to previous steps
   useEffect(() => {
@@ -81,7 +140,9 @@ export const EnhancedBooking = () => {
         </div>
       </div>
       
-      {activeTab === 'new' ? (
+      {loading ? (
+        <div className="text-center py-12">Loading booking data...</div>
+      ) : activeTab === 'new' ? (
         <div className="max-w-6xl mx-auto py-4 px-4">
           <BookingProgress currentStep={step} />
           

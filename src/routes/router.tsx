@@ -10,8 +10,15 @@ import { Login } from "../screens/Auth/Login";
 import { Register } from "../screens/Auth/Register";
 import { EnhancedBooking } from "../screens/booking";
 import { ProtectedRoute } from "../components/ProtectedRoute";
-import { AdminDashboard } from "../screens/Dashboard";
+import { AdminDashboard } from "../screens/admin/Dashboard";
 import { AdminRoute } from "../components/adminRoute";
+import { NotFound } from "../screens/NotFound";
+import { AdminOverview } from "../screens/admin/Overview";
+import { AdminUsers } from "../screens/admin/Users";
+import { AdminAppointments } from "../screens/admin/Appointments";
+import { AdminOrders } from "../screens/admin/Orders";
+import { AdminProducts } from "../screens/admin/Products";
+import { AdminSettings } from "../screens/admin/Settings";
 
 export const AppRoutes = () => (
   <Routes>
@@ -31,14 +38,24 @@ export const AppRoutes = () => (
       />
       <Route path="login" element={<Login />} />
       <Route path="register" element={<Register />} />
-      <Route
-        path="admin"
-        element={
-          <AdminRoute>
-            <AdminDashboard />
-          </AdminRoute>
-        }
-      />
+      <Route path="*" element={<NotFound />} />
+    </Route>
+    
+    {/* Admin Routes */}
+    <Route
+      path="/admin"
+      element={
+        <AdminRoute>
+          <AdminDashboard />
+        </AdminRoute>
+      }
+    >
+      <Route index element={<AdminOverview />} />
+      <Route path="users" element={<AdminUsers />} />
+      <Route path="appointments" element={<AdminAppointments />} />
+      <Route path="orders" element={<AdminOrders />} />
+      <Route path="products" element={<AdminProducts />} />
+      <Route path="settings" element={<AdminSettings />} />
     </Route>
   </Routes>
 );

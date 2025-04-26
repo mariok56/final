@@ -1,20 +1,20 @@
+// src/screens/Shop/hooks/useProductFilter.ts
 import { useState, useMemo, useCallback } from 'react';
-import { products as allProducts } from '../data/products';
 import { debounce } from '../../../utils/debounce';
 
-export const useProductFilter = () => {
+export const useProductFilter = (products: any[]) => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeSorting, setActiveSorting] = useState('featured');
   const [searchTerm, setSearchTerm] = useState('');
   
   const filteredProducts = useMemo(() => {
-    return allProducts.filter(product => {
+    return products.filter(product => {
       const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             product.brand.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchTerm]);
+  }, [products, activeCategory, searchTerm]);
   
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {

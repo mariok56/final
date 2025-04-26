@@ -1,6 +1,8 @@
 // src/store/shopStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 // Product type definition
 export type Product = {
@@ -54,14 +56,14 @@ interface ShopState {
   closeCheckout: () => void;
   setCheckoutStep: (step: number) => void;
   updateCheckoutForm: (field: keyof CheckoutFormData, value: string) => void;
-  completeOrder: () => void;
+  completeOrder: () => Promise<void>;
   resetOrderPlaced: () => void;
 }
 
 // Create the store
 export const useShopStore = create<ShopState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       cart: [],
       isCartOpen: false,
       isCheckoutOpen: false,
@@ -161,18 +163,45 @@ export const useShopStore = create<ShopState>()(
         }
       })),
       
-      completeOrder: () => set((state) => {
-        console.log('Order completed:', {
-          cart: state.cart,
-          customer: state.checkoutFormData
-        });
+      completeOrder: async () => {
+        const state = get();
         
-        return {
-          orderPlaced: true,
-          checkoutStep: 4,
-          // Will automatically clear cart after confirmation animation
-        };
-      }),
+        try {
+          // Calculate total
+          const subtotal = state.cart.reduce((total, item) => {
+            const price = item.product.salePrice || item.product.price;
+            return total + (price * item.quantity);
+          }, 0);
+          
+          const shipping = 5.99;
+          const tax = subtotal * 0.08;
+          const total = subtotal + shipping + tax;
+          
+          // Create order document in Firestore
+          const orderData = {
+            items: state.cart,
+            customer: state.checkoutFormData,
+            subtotal,
+            shipping,
+            tax,
+            total,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            userId: state.checkoutFormData.email, // Temporary: using email as userId
+          };
+          
+          const docRef = await addDoc(collection(db, 'orders'), orderData);
+          console.log('Order created with ID:', docRef.id);
+          
+          set({
+            orderPlaced: true,
+            checkoutStep: 4,
+          });
+        } catch (error) {
+          console.error('Error creating order:', error);
+          throw error;
+        }
+      },
       
       resetOrderPlaced: () => set({ orderPlaced: false })
     }),
@@ -182,121 +211,3 @@ export const useShopStore = create<ShopState>()(
     }
   )
 );
-
-// Helper function to calculate cart total
-export const getCartTotal = (cart: CartItem[]) => {
-  return cart.reduce((total, item) => {
-    const price = item.product.salePrice || item.product.price;
-    return total + (price * item.quantity);
-  }, 0);
-};
-
-// Helper function to calculate cart count
-export const getCartCount = (cart: CartItem[]) => {
-  return cart.reduce((total, item) => total + item.quantity, 0);
-};
-
-// Helper function to check if product is in cart
-export const isProductInCart = (cart: CartItem[], productId: number) => {
-  return cart.some(item => item.product.id === productId);
-};
-
-// Helper function to get product quantity in cart
-export const getProductQuantityInCart = (cart: CartItem[], productId: number) => {
-  const item = cart.find(item => item.product.id === productId);
-  return item ? item.quantity : 0;
-};
-
-// Sample products data that can be used across the application
-export const sampleProducts: Product[] = [
-  {
-    id: 1,
-    name: "Hydrating Shampoo",
-    brand: "Kerastase",
-    price: 28.99,
-    image: "./hydrating.png",
-    category: "shampoo",
-    bestseller: true,
-    isNew: false,
-    inStock: true
-  },
-  {
-    id: 2,
-    name: "Repair Conditioner",
-    brand: "Oribe",
-    price: 32.99,
-    image: "./repair.png",
-    category: "conditioner",
-    bestseller: false,
-    isNew: true,
-    inStock: true
-  },
-  {
-    id: 3,
-    name: "Styling Pomade",
-    brand: "Aveda",
-    price: 24.99,
-    salePrice: 19.99,
-    image: "/pomade.png",
-    category: "styling",
-    bestseller: false,
-    isNew: false,
-    inStock: true
-  },
-  {
-    id: 4,
-    name: "Hair Oil Treatment",
-    brand: "Moroccanoil",
-    price: 46.99,
-    image: "./hairoil.png",
-    category: "treatment",
-    bestseller: true,
-    isNew: false,
-    inStock: true
-  },
-  {
-    id: 5,
-    name: "Volume Spray",
-    brand: "Kevin Murphy",
-    price: 29.99,
-    image: "/spray.png",
-    category: "styling",
-    bestseller: false,
-    isNew: true,
-    inStock: true
-  },
-  {
-    id: 6,
-    name: "Curl Defining Cream",
-    brand: "DevaCurl",
-    price: 26.99,
-    image: "./curl.png",
-    category: "styling",
-    bestseller: false,
-    isNew: false,
-    inStock: false
-  },
-  {
-    id: 7,
-    name: "Color Protection Shampoo",
-    brand: "Pureology",
-    price: 34.99,
-    salePrice: 29.99,
-    image: "./colorprotection.png",
-    category: "shampoo",
-    bestseller: false,
-    isNew: false,
-    inStock: true
-  },
-  {
-    id: 8,
-    name: "Deep Repair Mask",
-    brand: "Redken",
-    price: 38.99,
-    image: "./deep.png",
-    category: "treatment",
-    bestseller: true,
-    isNew: false,
-    inStock: true
-  }
-];

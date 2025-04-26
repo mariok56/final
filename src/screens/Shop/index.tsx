@@ -1,4 +1,7 @@
-import { useState } from 'react';
+// src/screens/Shop/index.tsx
+import { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { ShoppingCart, Filter, ChevronDown } from 'lucide-react';
 import { useShopStore } from '../../store/shopStore';
 import { ShopHero } from './components/shophero';
@@ -14,15 +17,36 @@ import { useProductFilter } from './hooks/useProductFilter';
 export const Shop = () => {
   const { cart, isCartOpen, isCheckoutOpen, toggleCart } = useShopStore();
   const [showFilters, setShowFilters] = useState(false);
+  const [products, setProducts] = useState<{ id: string; [key: string]: any }[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsData = productsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProducts(productsData);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
   
   const {
-    products,
+    products: filteredProducts,
     activeCategory,
     setActiveCategory,
     activeSorting,
     setActiveSorting,
     handleSearch,
-  } = useProductFilter();
+  } = useProductFilter(products);
   
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   
@@ -67,11 +91,17 @@ export const Shop = () => {
             onSortChange={setActiveSorting}
           />
           
-          <ProductGrid products={products} />
+          {loading ? (
+            <div className="col-span-1 md:col-span-3 text-center py-12">
+              Loading products...
+            </div>
+          ) : (
+            <ProductGrid products={filteredProducts} />
+          )}
         </div>
       </div>
       
-      <FeaturedProducts />
+      <FeaturedProducts products={products} />
       <Newsletter />
       
       {isCartOpen && <CartDropdown />}
@@ -79,4 +109,3 @@ export const Shop = () => {
     </div>
   );
 };
-

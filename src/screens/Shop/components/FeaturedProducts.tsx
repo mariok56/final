@@ -1,8 +1,8 @@
+// src/screens/Shop/components/FeaturedProducts.tsx
 import { Button } from '../../../components/ui/button';
 import { useShopStore } from '../../../store/shopStore';
-import { products } from '../data/products';
 
-export const FeaturedProducts = () => {
+export const FeaturedProducts = ({ products }: { products: any[] }) => {
   const { addToCart } = useShopStore();
   
   const featuredProducts = products.filter(product => product.bestseller);

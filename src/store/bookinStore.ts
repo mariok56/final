@@ -1,5 +1,8 @@
+// src/store/bookingStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { collection, addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 // Types
 interface TimeSlot {
@@ -12,7 +15,7 @@ interface Service {
   id: string;
   name: string;
   price: number;
-  duration: number; // in minutes
+  duration: number;
   description: string;
   image: string;
 }
@@ -24,10 +27,10 @@ interface Stylist {
   image: string;
   rating: number;
   experience: string;
-  availableDays: number[]; // 0-6 (Sunday to Saturday)
+  availableDays: number[];
   workingHours: {
-    start: string; // "09:00"
-    end: string;   // "17:00"
+    start: string;
+    end: string;
   };
 }
 
@@ -50,51 +53,36 @@ interface BookingState {
   appointments: Appointment[];
   stylists: Stylist[];
   services: Service[];
-  
-  // Booking state
   selectedServices: Service[];
   selectedStylist: Stylist | null;
   selectedDate: string | null;
   selectedTimeSlot: TimeSlot | null;
   
-  // Actions
   addService: (service: Service) => void;
   removeService: (serviceId: string) => void;
   clearServices: () => void;
   selectStylist: (stylist: Stylist | null) => void;
   selectDate: (date: string | null) => void;
   selectTimeSlot: (timeSlot: TimeSlot | null) => void;
-  
-  // Appointment management
   createAppointment: (userId: string, notes?: string) => Promise<Appointment>;
   cancelAppointment: (appointmentId: string) => Promise<boolean>;
-  rescheduleAppointment: (appointmentId: string, newDate: string, newTime: string) => Promise<boolean>;
-  
-  // Availability checks
   getStylistAvailability: (stylistId: number, date: string | null) => TimeSlot[];
-  getAvailableStylists: (date: string | null, serviceIds: string[]) => Stylist[];
-  
-  // Calendar integration
   generateICalendarEvent: (appointment: Appointment) => string;
-  
-  // Email confirmation (mock)
-  sendConfirmationEmail: (appointment: Appointment) => Promise<boolean>;
+  fetchAppointments: (userId?: string) => Promise<void>;
 }
 
 // Helper functions
 const generateTimeSlots = (date: string, stylist: Stylist, existingAppointments: Appointment[], duration: number): TimeSlot[] => {
   const slots: TimeSlot[] = [];
-  if (!date) return slots;  // Add this safety check
+  if (!date) return slots;
   
   const dateObj = new Date(date);
   const dayOfWeek = dateObj.getDay();
   
-  // Check if stylist works on this day
   if (!stylist.availableDays.includes(dayOfWeek)) {
     return slots;
   }
   
-  // Generate time slots based on working hours
   const [startHour, startMinute] = stylist.workingHours.start.split(':').map(Number);
   const [endHour, endMinute] = stylist.workingHours.end.split(':').map(Number);
   
@@ -130,14 +118,12 @@ const generateTimeSlots = (date: string, stylist: Stylist, existingAppointments:
       available: !hasConflict
     });
     
-    // Increment by 30 minutes
     currentTime.setMinutes(currentTime.getMinutes() + 30);
   }
   
   return slots;
 };
 
-// Create store
 export const useBookingStore = create<BookingState>()(
   persist(
     (set, get) => ({
@@ -150,7 +136,7 @@ export const useBookingStore = create<BookingState>()(
           image: "/stylists/alex.jpg",
           rating: 4.9,
           experience: "8 years",
-          availableDays: [1, 2, 3, 5, 6], // Mon, Tue, Wed, Fri, Sat
+          availableDays: [1, 2, 3, 5, 6],
           workingHours: { start: "09:00", end: "18:00" }
         },
         { 
@@ -160,7 +146,7 @@ export const useBookingStore = create<BookingState>()(
           image: "/stylists/jamie.jpg",
           rating: 4.8,
           experience: "6 years",
-          availableDays: [2, 3, 4, 6], // Tue, Wed, Thu, Sat
+          availableDays: [2, 3, 4, 6],
           workingHours: { start: "10:00", end: "19:00" }
         },
         { 
@@ -170,7 +156,7 @@ export const useBookingStore = create<BookingState>()(
           image: "/stylists/taylor.jpg",
           rating: 4.7,
           experience: "5 years",
-          availableDays: [1, 3, 4, 5, 6], // Mon, Wed, Thu, Fri, Sat
+          availableDays: [1, 3, 4, 5, 6],
           workingHours: { start: "09:00", end: "17:00" }
         },
       ],
@@ -254,8 +240,7 @@ export const useBookingStore = create<BookingState>()(
         endTimeDate.setMinutes(endTimeDate.getMinutes() + totalDuration);
         const endTime = endTimeDate.toTimeString().slice(0, 5);
         
-        const appointment: Appointment = {
-          id: `apt-${Date.now()}`,
+        const appointmentData: Omit<Appointment, 'id'> = {
           userId,
           stylistId: selectedStylist.id,
           services: selectedServices,
@@ -264,78 +249,57 @@ export const useBookingStore = create<BookingState>()(
           endTime,
           totalDuration,
           totalPrice,
-          status: 'confirmed',
+          status: 'confirmed' as const,  // Using type assertion to fix the type issue
           createdAt: new Date().toISOString(),
           notes
         };
         
-        // Add the appointment to the list
+        // Save to Firestore
+        const docRef = await addDoc(collection(db, 'appointments'), appointmentData);
+        
+        const appointment: Appointment = {
+          id: docRef.id,
+          ...appointmentData
+        };
+        
+        // Update local state
         set((state) => ({
           appointments: [...state.appointments, appointment],
-        }));
-        
-        // Clear selections after creating the appointment
-        set({
           selectedServices: [],
           selectedStylist: null,
           selectedDate: null,
           selectedTimeSlot: null
-        });
-        
-        // Send confirmation email
-        await get().sendConfirmationEmail(appointment);
+        }));
         
         return appointment;
       },
       
       cancelAppointment: async (appointmentId) => {
-        set((state) => ({
-          appointments: state.appointments.map(apt => 
-            apt.id === appointmentId ? { ...apt, status: 'cancelled' } : apt
-          )
-        }));
-        return true;
-      },
-      
-      rescheduleAppointment: async (appointmentId, newDate, newTime) => {
-        const appointment = get().appointments.find(apt => apt.id === appointmentId);
-        if (!appointment) return false;
-        
-        const totalDuration = appointment.services.reduce((sum, service) => sum + service.duration, 0);
-        const endTimeDate = new Date(`${newDate} ${newTime}`);
-        endTimeDate.setMinutes(endTimeDate.getMinutes() + totalDuration);
-        const endTime = endTimeDate.toTimeString().slice(0, 5);
-        
-        set((state) => ({
-          appointments: state.appointments.map(apt => 
-            apt.id === appointmentId 
-              ? { ...apt, date: newDate, startTime: newTime, endTime }
-              : apt
-          )
-        }));
-        
-        return true;
+        try {
+          await updateDoc(doc(db, 'appointments', appointmentId), {
+            status: 'cancelled'
+          });
+          
+          set((state) => ({
+            appointments: state.appointments.map(apt => 
+              apt.id === appointmentId ? { ...apt, status: 'cancelled' as const } : apt
+            )
+          }));
+          
+          return true;
+        } catch (error) {
+          console.error('Error cancelling appointment:', error);
+          return false;
+        }
       },
       
       getStylistAvailability: (stylistId, date) => {
         const state = get();
         const stylist = state.stylists.find(s => s.id === stylistId);
-        if (!stylist || !date) return [];  // Add null check for date
+        if (!stylist || !date) return [];
         
         const totalDuration = state.selectedServices.reduce((sum, service) => sum + service.duration, 0) || 60;
         return generateTimeSlots(date, stylist, state.appointments, totalDuration);
-      },
-      
-      getAvailableStylists: (date, serviceIds) => {
-        const state = get();
-        if (!date) return state.stylists;  // Return all stylists if no date is selected
-        
-        const dateObj = new Date(date);
-        const dayOfWeek = dateObj.getDay();
-        
-        return state.stylists.filter(stylist => 
-          stylist.availableDays.includes(dayOfWeek)
-        );
       },
       
       generateICalendarEvent: (appointment) => {
@@ -359,29 +323,29 @@ END:VEVENT
 END:VCALENDAR`;
       },
       
-      sendConfirmationEmail: async (appointment) => {
-        // Mock email sending
-        const state = get();
-        const stylist = state.stylists.find(s => s.id === appointment.stylistId);
-        
-        // In a real application, you would:
-        // 1. Get the user data from your database or auth store
-        // 2. Generate the email HTML
-        // 3. Send the email through a service like SendGrid
-        
-        console.log('Sending confirmation email for appointment:', appointment);
-        
-        // Example of how you might use this in a real backend:
-        // const user = await getUserById(appointment.userId);
-        // const emailHTML = generateEmailHTML({ appointment, user, stylist });
-        // await sendgrid.send({
-        //   to: user.email,
-        //   from: 'bookings@choppers.com',
-        //   subject: 'Your Appointment Confirmation',
-        //   html: emailHTML
-        // });
-        
-        return true;
+      fetchAppointments: async (userId?: string) => {
+        try {
+          let appointmentsQuery;
+          
+          if (userId) {
+            appointmentsQuery = query(
+              collection(db, 'appointments'),
+              where('userId', '==', userId)
+            );
+          } else {
+            appointmentsQuery = collection(db, 'appointments');
+          }
+          
+          const querySnapshot = await getDocs(appointmentsQuery);
+          const appointments = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Appointment[];
+          
+          set({ appointments });
+        } catch (error) {
+          console.error('Error fetching appointments:', error);
+        }
       }
     }),
     {
