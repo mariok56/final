@@ -1,10 +1,11 @@
+
 import { Button } from "../components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
 export const Home = () => {
   const navigate = useNavigate();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated); // <- get from Zustand
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const handleBookNowClick = () => {
     if (!isAuthenticated) {

@@ -1,3 +1,4 @@
+// src/screens/Auth/Login.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
@@ -55,6 +56,18 @@ export const Login = () => {
       navigate('/booking');
     } else {
       setAuthError(result.message);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const email = prompt('Enter your email address:');
+    if (email) {
+      const result = await useAuthStore.getState().requestPasswordReset(email);
+      if (result.success) {
+        alert('Password reset email sent. Please check your inbox.');
+      } else {
+        alert(result.message);
+      }
     }
   };
 
@@ -127,9 +140,13 @@ export const Login = () => {
               </div>
               
               <div className="text-sm">
-                <a href="#" className="font-medium text-[#fbb034] hover:text-[#fbb034]/90">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="font-medium text-[#fbb034] hover:text-[#fbb034]/90"
+                >
                   Forgot password?
-                </a>
+                </button>
               </div>
             </div>
             
