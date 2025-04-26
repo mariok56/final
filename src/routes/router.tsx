@@ -10,6 +10,8 @@ import { Login } from "../screens/Auth/Login";
 import { Register } from "../screens/Auth/Register";
 import { EnhancedBooking } from "../screens/booking";
 import { ProtectedRoute } from "../components/ProtectedRoute";
+import { AdminDashboard } from "../screens/Dashboard";
+import { AdminRoute } from "../components/adminRoute";
 
 export const AppRoutes = () => (
   <Routes>
@@ -29,6 +31,14 @@ export const AppRoutes = () => (
       />
       <Route path="login" element={<Login />} />
       <Route path="register" element={<Register />} />
+      <Route
+        path="admin"
+        element={
+          <AdminRoute>
+            <AdminDashboard />
+          </AdminRoute>
+        }
+      />
     </Route>
   </Routes>
 );

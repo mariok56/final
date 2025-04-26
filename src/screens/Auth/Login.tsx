@@ -53,7 +53,15 @@ export const Login = () => {
     });
     
     if (result.success) {
-      navigate('/booking');
+      // Get the latest user data after login
+      const user = useAuthStore.getState().user;
+      
+      // Navigate based on user role
+      if (user?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/booking');
+      }
     } else {
       setAuthError(result.message);
     }

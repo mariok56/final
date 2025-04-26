@@ -1,6 +1,7 @@
 // src/config/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
 // Firebase configuration
@@ -17,6 +18,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Initialize analytics only if we have all required values
 let analytics;
@@ -28,4 +30,4 @@ try {
   console.warn('Analytics initialization failed:', error);
 }
 
-export { app, auth, analytics };
+export { app, auth, db, analytics };

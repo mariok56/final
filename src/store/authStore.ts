@@ -1,4 +1,4 @@
-// src/store/firebaseAuthStore.ts
+// src/store/authStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
@@ -10,13 +10,15 @@ import {
   onAuthStateChanged,
   User as FirebaseUser
 } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // Define user types
 interface User {
   id: string;
   name: string;
   email: string;
+  role?: 'admin' | 'user';
 }
 
 interface RegisterData {
@@ -77,12 +79,21 @@ export const useAuthStore = create<AuthState>()(
             displayName: data.name
           });
           
+          // Create user document in Firestore with default 'user' role
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            name: data.name,
+            email: data.email,
+            role: 'user',
+            createdAt: new Date().toISOString()
+          });
+          
           // Update store state
           set({
             user: {
               id: userCredential.user.uid,
               name: data.name,
               email: data.email,
+              role: 'user',
             },
             firebaseUser: userCredential.user,
             isAuthenticated: true,
@@ -130,12 +141,22 @@ export const useAuthStore = create<AuthState>()(
             data.password
           );
           
+          // Fetch user role from Firestore
+          const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+          let userRole: 'admin' | 'user' = 'user'; // Default to 'user' role
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            userRole = userData.role || 'user';
+          }
+          
           // Update store state
           set({
             user: {
               id: userCredential.user.uid,
               name: userCredential.user.displayName || '',
               email: userCredential.user.email || '',
+              role: userRole,
             },
             firebaseUser: userCredential.user,
             isAuthenticated: true,
@@ -219,13 +240,23 @@ export const useAuthStore = create<AuthState>()(
 
       initializeAuth: () => {
         // Listen for auth state changes
-        onAuthStateChanged(auth, (firebaseUser) => {
+        onAuthStateChanged(auth, async (firebaseUser) => {
           if (firebaseUser) {
+            // Fetch user role when auth state changes
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            let userRole: 'admin' | 'user' = 'user';
+            
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              userRole = userData.role || 'user';
+            }
+            
             set({
               user: {
                 id: firebaseUser.uid,
                 name: firebaseUser.displayName || '',
                 email: firebaseUser.email || '',
+                role: userRole,
               },
               firebaseUser,
               isAuthenticated: true,

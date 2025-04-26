@@ -1,3 +1,4 @@
+// src/components/navbar.tsx
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
@@ -12,8 +13,9 @@ export const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Get authentication state and logout function from Zustand store
+  // Get authentication state, user info, and logout function from Zustand store
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
   const navItems = [
@@ -22,6 +24,7 @@ export const Layout = () => {
     { name: "Services", path: "/services" },
     { name: "Shop", path: "/shop" },
     { name: "Contact", path: "/contact" },
+    ...(user?.role === 'admin' ? [{ name: "Admin", path: "/admin" }] : []),
   ];
 
   const handleBookNowClick = () => {
