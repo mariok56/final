@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Button } from '../../components/ui/button';
-import { Save, Clock, Mail, Phone, MapPin } from 'lucide-react';
+import { Save} from 'lucide-react';
 
 interface SalonSettings {
   businessName: string;
