@@ -1,4 +1,3 @@
-// src/routes/router.tsx
 import { Routes, Route } from "react-router-dom";
 import { Layout } from "../components/navbar";
 import { Home } from "../screens/Home";

@@ -1,7 +1,56 @@
 import { Link } from "react-router-dom";
 import { Facebook, Instagram, Twitter, Mail, MapPin, Phone } from "lucide-react";
+import { useState, useEffect } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../config/firebase";
 
 export const Footer = () => {
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settingsDoc = await getDoc(doc(db, 'settings', 'salon'));
+        if (settingsDoc.exists()) {
+          // Explicitly cast to any to avoid TypeScript errors
+          setSettings(settingsDoc.data() as any);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+  // Function to format opening hours
+  const formatOpeningHours = () => {
+    if (!settings?.openingHours) {
+      return (
+        <>
+          Mon-Fri: 9:00 AM - 8:00 PM<br />
+          Sat-Sun: 10:00 AM - 6:00 PM
+        </>
+      );
+    }
+    
+    const daysInfo = [];
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    for (const day of dayNames) {
+      const dayInfo = settings.openingHours[day];
+      if (!dayInfo.closed) {
+        daysInfo.push(
+          <div key={day}>
+            {day.charAt(0).toUpperCase() + day.slice(1)}: {dayInfo.open} - {dayInfo.close}
+          </div>
+        );
+      }
+    }
+    
+    return daysInfo;
+  };
+
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-6xl mx-auto px-4 py-12">
@@ -84,21 +133,20 @@ export const Footer = () => {
               <li className="flex items-start">
                 <MapPin size={20} className="text-[#fbb034] mr-3 mt-1 flex-shrink-0" />
                 <span className="text-gray-400">
-                  123 Salon Street, Beauty District, City, 10001
+                  {settings?.address || "123 Salon Street, Beauty District, City, 10001"}
                 </span>
               </li>
               <li className="flex items-center">
                 <Phone size={20} className="text-[#fbb034] mr-3 flex-shrink-0" />
-                <span className="text-gray-400">(123) 456-7890</span>
+                <span className="text-gray-400">{settings?.phone || "(123) 456-7890"}</span>
               </li>
               <li className="flex items-center">
                 <Mail size={20} className="text-[#fbb034] mr-3 flex-shrink-0" />
-                <span className="text-gray-400">info@choppers.com</span>
+                <span className="text-gray-400">{settings?.email || "info@choppers.com"}</span>
               </li>
               <li className="text-gray-400 mt-4">
                 <strong className="block text-white">Opening Hours:</strong>
-                Mon-Fri: 9:00 AM - 8:00 PM<br />
-                Sat-Sun: 10:00 AM - 6:00 PM
+                {formatOpeningHours()}
               </li>
             </ul>
           </div>
@@ -106,7 +154,7 @@ export const Footer = () => {
 
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-400 text-sm">
-            &copy; {new Date().getFullYear()} Choppers Salon. All rights reserved.
+            &copy; {new Date().getFullYear()} {settings?.businessName || "Choppers Salon"}. All rights reserved.
           </p>
           <div className="flex space-x-4 mt-4 md:mt-0">
             <a href="#" className="text-gray-400 hover:text-[#fbb034] text-sm">Privacy Policy</a>

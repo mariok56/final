@@ -49,6 +49,27 @@ interface Appointment {
   notes?: string;
 }
 
+interface SalonSettings {
+  businessName: string;
+  email: string;
+  phone: string;
+  address: string;
+  openingHours: {
+    monday: { open: string; close: string; closed: boolean };
+    tuesday: { open: string; close: string; closed: boolean };
+    wednesday: { open: string; close: string; closed: boolean };
+    thursday: { open: string; close: string; closed: boolean };
+    friday: { open: string; close: string; closed: boolean };
+    saturday: { open: string; close: string; closed: boolean };
+    sunday: { open: string; close: string; closed: boolean };
+  };
+  bookingSettings: {
+    maxAdvanceBookingDays: number;
+    minAdvanceBookingHours: number;
+    cancellationPolicyHours: number;
+  };
+}
+
 interface BookingState {
   appointments: Appointment[];
   stylists: Stylist[];
@@ -57,6 +78,7 @@ interface BookingState {
   selectedStylist: Stylist | null;
   selectedDate: string | null;
   selectedTimeSlot: TimeSlot | null;
+  salonSettings: SalonSettings | null;
   
   addService: (service: Service) => void;
   removeService: (serviceId: string) => void;
@@ -69,28 +91,61 @@ interface BookingState {
   getStylistAvailability: (stylistId: number, date: string | null) => TimeSlot[];
   generateICalendarEvent: (appointment: Appointment) => string;
   fetchAppointments: (userId?: string) => Promise<void>;
+  setSalonSettings: (settings: SalonSettings) => void;
 }
 
 // Helper functions
-const generateTimeSlots = (date: string, stylist: Stylist, existingAppointments: Appointment[], duration: number): TimeSlot[] => {
+const generateTimeSlots = (date: string, stylist: Stylist, existingAppointments: Appointment[], duration: number, salonSettings?: SalonSettings | null): TimeSlot[] => {
   const slots: TimeSlot[] = [];
   if (!date) return slots;
   
   const dateObj = new Date(date);
-  const dayOfWeek = dateObj.getDay();
+  const dayOfWeek = dateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
   
+  // Check if stylist works on this day
   if (!stylist.availableDays.includes(dayOfWeek)) {
     return slots;
   }
   
-  const [startHour, startMinute] = stylist.workingHours.start.split(':').map(Number);
-  const [endHour, endMinute] = stylist.workingHours.end.split(':').map(Number);
+  // Check if salon is open on this day based on settings
+  if (salonSettings) {
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[dayOfWeek] as keyof typeof salonSettings.openingHours;
+    
+    // If salon is closed on this day, return empty array
+    if (salonSettings.openingHours[dayName]?.closed) {
+      return slots;
+    }
+  }
+  
+  // Get working hours - use salon settings if available, otherwise use stylist's hours
+  let startHour = stylist.workingHours.start;
+  let endHour = stylist.workingHours.end;
+  
+  if (salonSettings) {
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[dayOfWeek] as keyof typeof salonSettings.openingHours;
+    
+    if (salonSettings.openingHours[dayName] && !salonSettings.openingHours[dayName].closed) {
+      const salonStart = salonSettings.openingHours[dayName].open;
+      const salonEnd = salonSettings.openingHours[dayName].close;
+      
+      // Use the later start time (between salon and stylist)
+      if (salonStart > startHour) startHour = salonStart;
+      
+      // Use the earlier end time (between salon and stylist)
+      if (salonEnd < endHour) endHour = salonEnd;
+    }
+  }
+  
+  const [startHourVal, startMinuteVal] = startHour.split(':').map(Number);
+  const [endHourVal, endMinuteVal] = endHour.split(':').map(Number);
   
   const startTime = new Date(dateObj);
-  startTime.setHours(startHour, startMinute, 0);
+  startTime.setHours(startHourVal, startMinuteVal, 0);
   
   const endTime = new Date(dateObj);
-  endTime.setHours(endHour, endMinute, 0);
+  endTime.setHours(endHourVal, endMinuteVal, 0);
   
   let currentTime = new Date(startTime);
   
@@ -100,10 +155,12 @@ const generateTimeSlots = (date: string, stylist: Stylist, existingAppointments:
     
     // Check if slot conflicts with existing appointments
     const hasConflict = existingAppointments.some(appointment => {
-      if (appointment.stylistId !== stylist.id || appointment.date !== date) return false;
+      if (appointment.stylistId !== stylist.id || appointment.date !== date || appointment.status === 'cancelled') {
+        return false;
+      }
       
-      const apptStart = new Date(`${appointment.date} ${appointment.startTime}`);
-      const apptEnd = new Date(`${appointment.date} ${appointment.endTime}`);
+      const apptStart = new Date(`${appointment.date}T${appointment.startTime}`);
+      const apptEnd = new Date(`${appointment.date}T${appointment.endTime}`);
       const slotStart = currentTime;
       const slotEnd = slotEndTime;
       
@@ -207,6 +264,9 @@ export const useBookingStore = create<BookingState>()(
       selectedStylist: null,
       selectedDate: null,
       selectedTimeSlot: null,
+      salonSettings: null,
+      
+      setSalonSettings: (settings: any) => set({ salonSettings: settings }),
       
       addService: (service) => set((state) => ({
         selectedServices: [...state.selectedServices, service]
@@ -236,7 +296,7 @@ export const useBookingStore = create<BookingState>()(
         const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
         
         const startTime = selectedTimeSlot.time;
-        const endTimeDate = new Date(`${selectedDate} ${startTime}`);
+        const endTimeDate = new Date(`${selectedDate}T${startTime}`);
         endTimeDate.setMinutes(endTimeDate.getMinutes() + totalDuration);
         const endTime = endTimeDate.toTimeString().slice(0, 5);
         
@@ -249,7 +309,7 @@ export const useBookingStore = create<BookingState>()(
           endTime,
           totalDuration,
           totalPrice,
-          status: 'confirmed' as const,  // Using type assertion to fix the type issue
+          status: 'confirmed' as const,
           createdAt: new Date().toISOString(),
           notes
         };
@@ -299,15 +359,15 @@ export const useBookingStore = create<BookingState>()(
         if (!stylist || !date) return [];
         
         const totalDuration = state.selectedServices.reduce((sum, service) => sum + service.duration, 0) || 60;
-        return generateTimeSlots(date, stylist, state.appointments, totalDuration);
+        return generateTimeSlots(date, stylist, state.appointments, totalDuration, state.salonSettings);
       },
       
       generateICalendarEvent: (appointment) => {
         const stylist = get().stylists.find(s => s.id === appointment.stylistId);
         const services = appointment.services.map(s => s.name).join(', ');
         
-        const start = new Date(`${appointment.date} ${appointment.startTime}`);
-        const end = new Date(`${appointment.date} ${appointment.endTime}`);
+        const start = new Date(`${appointment.date}T${appointment.startTime}`);
+        const end = new Date(`${appointment.date}T${appointment.endTime}`);
         
         const formatDate = (date: Date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
         

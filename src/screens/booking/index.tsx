@@ -1,6 +1,6 @@
 // src/screens/booking/index.tsx
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useBookingStore } from '../../store/bookinStore';
 import { useAuthStore } from '../../store/authStore';
@@ -25,12 +25,26 @@ export const EnhancedBooking = () => {
     selectTimeSlot,
     clearServices,
     fetchAppointments,
+    setSalonSettings,
   } = useBookingStore();
   
-  // Fetch services and stylists from Firestore on component mount
+  // Fetch services, stylists, and settings from Firestore on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch salon settings
+        try {
+          const settingsDoc = await getDoc(doc(db, 'settings', 'salon'));
+          if (settingsDoc.exists()) {
+            const settingsData = settingsDoc.data();
+            console.log('Loaded salon settings:', settingsData);
+            // Type cast to any to avoid TypeScript errors
+            setSalonSettings(settingsData as any);
+          }
+        } catch (error) {
+          console.error('Error fetching salon settings:', error);
+        }
+        
         // Fetch services
         const servicesSnapshot = await getDocs(collection(db, 'services'));
         const servicesData = servicesSnapshot.docs.map(doc => {
@@ -56,8 +70,8 @@ export const EnhancedBooking = () => {
             image: data.image || '',
             rating: data.rating || 0,
             experience: data.experience || 0,
-            availableDays: data.availability?.map((a: any) => a.day) || [],
-            workingHours: data.availability?.map((a: any) => a.hours) || []
+            availableDays: data.availableDays || [],
+            workingHours: data.workingHours || { start: "09:00", end: "18:00" }
           };
         });
         
@@ -79,7 +93,7 @@ export const EnhancedBooking = () => {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, setSalonSettings, fetchAppointments]);
   
   // Reset selections when going back to previous steps
   useEffect(() => {
