@@ -141,12 +141,13 @@ const initialServices = [
 ];
 
 // Stylists data
+// src/scripts/initializeFirebaseData.ts
 const initialStylists = [
   { 
     id: 1, 
     name: "Alex Johnson", 
     specialty: "Coloring Expert", 
-    image: "/stylists/alex.jpg",
+    image: "https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=500",
     rating: 4.9,
     experience: "8 years",
     availableDays: [1, 2, 3, 5, 6],
@@ -156,7 +157,7 @@ const initialStylists = [
     id: 2, 
     name: "Jamie Smith", 
     specialty: "Cutting Specialist", 
-    image: "/stylists/jamie.jpg",
+    image: "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=500",
     rating: 4.8,
     experience: "6 years",
     availableDays: [2, 3, 4, 6],
@@ -166,7 +167,7 @@ const initialStylists = [
     id: 3, 
     name: "Taylor Wilson", 
     specialty: "Styling Professional", 
-    image: "/stylists/taylor.jpg",
+    image: "https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=500",
     rating: 4.7,
     experience: "5 years",
     availableDays: [1, 3, 4, 5, 6],
